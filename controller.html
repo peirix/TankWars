@@ -81,6 +81,11 @@
 		<img src="crack.png" id="crack">
 		
 		<script>
+			if (location.href.indexOf("controller.html") == -1 &&
+			    !navigator.userAgent.match(/(iPhone|iPod|iPad|Android|BlackBerry|Windows Phone|ZuneWP7)/)) {
+				location.href = "index.html";
+			}
+			
 			$("#morePlayers").hide();
 			$("#controller").hide();
 			
