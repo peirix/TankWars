@@ -1,5 +1,7 @@
 Super simple websocket game.
 
+Try at http://tankwars.herokuapp.com
+
 Installation:
 - Install node.js
 - run 'npm install' in directory
