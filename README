@@ -1,0 +1,7 @@
+Super simple websocket game.
+
+Installation:
+- Install node.js
+- run 'npm install' in directory
+- run 'node server.js'
+- have fun.
