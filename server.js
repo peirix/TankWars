@@ -6,7 +6,7 @@ var path = require("path");
 
 var port = process.env.PORT || 8080
 
-server.listen(port);
+server.listen(port); 
 
 function serverCreated(req, res) {
 	var uri = url.parse(req.url).pathname;
