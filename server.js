@@ -4,7 +4,9 @@ var fs = require("fs");
 var url = require("url");
 var path = require("path");
 
-server.listen(8080);
+var port = process.env.PORT || 8080
+
+server.listen(port);
 
 function serverCreated(req, res) {
 	var uri = url.parse(req.url).pathname;
