@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+	<head>
+	    <script src="http://code.jquery.com/jquery-latest.min.js"></script>
+		<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.js"></script>
+		<link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/base/jquery-ui.css">
+		<style>
+			#stage {
+				width: 700px;
+				height: 400px;
+				background-color: #ccc;
+				overflow: hidden;
+			}
+			
+			#aim { width: 200px; }
+			
+			#tanks {
+				width: 150px;
+				height: 100px;
+				background-color: green;
+				position: absolute;
+				top: 200px;
+				left: 130px;
+			}
+			
+			#barrel {
+				height: 100px;
+				width: 10px;
+				position: absolute;
+				top: -50px;
+				left: 70px;
+				background-color: blue;
+				-webkit-transform-origin: bottom center;
+			}
+			
+			#shoot {
+				position: absolute;
+				top: 40px;
+				left: 50px;
+				height: 80px;
+				width: 120px;
+				background-color: red;
+			}
+			
+			#power {
+				position: absolute;
+				left: 20px;
+				top: 40px;
+				height: 150px;
+				width: 20px;
+				background-image: linear-gradient(bottom, rgb(250,0,0) 100%, rgb(213,227,22) 0%);
+				background-image: -o-linear-gradient(bottom, rgb(250,0,0) 100%, rgb(213,227,22) 0%);
+				background-image: -moz-linear-gradient(bottom, rgb(250,0,0) 100%, rgb(213,227,22) 0%);
+				background-image: -webkit-linear-gradient(bottom, rgb(250,0,0) 100%, rgb(213,227,22) 0%);
+				background-image: -ms-linear-gradient(bottom, rgb(250,0,0) 100%, rgb(213,227,22) 0%);
+				background-image: -webkit-gradient(
+												linear,
+												left bottom,
+												left top,
+												color-stop(1, rgb(250,0,0)),
+												color-stop(0, rgb(213,227,22))
+											);
+			}
+			
+			#power div {
+				position: absolute;
+				bottom: 0;
+				height: 2px;
+				width: 30px;
+				left: -5px;
+				background-color: #000;
+			}
+			
+			#target {
+				width: 150px;
+				height: 100px;
+				background-color: orange;
+				position: absolute;
+				top: 200px;
+				left: 500px;
+			}
+			
+			#bullet {
+				width: 10px;
+				height: 10px;
+				background-color: red;
+				-webkit-border-radius: 10px;
+				-moz-border-radius: 10px;
+				border-radius: 10px;
+				position: absolute;
+			}
+		</style>
+	</head>
+	
+	<body>
+		
+		<div id="stage">
+			<div id="aim"></div>
+			<div id="power"><div></div></div>
+			<div id="shoot"></div>
+			
+			<div id="tanks"><div id="barrel"></div></div>
+			<div id="target"></div>
+			<div id="bullet"></div>
+		</div>
+		<script>
+			var aim = 0,
+				power = 0,
+				powerIncrease,
+				fireInterval;
+			
+			$("#aim").slider({
+				min: -70,
+				max: 70,
+				slide: function(e, ui) {
+					aim = ui.value;
+					$("#barrel").css("-webkit-transform", "rotateZ(" + aim + "deg)");
+				}
+			});
+			
+			$("#shoot").mousedown(function() {
+				powerIncrease = setInterval(function() {
+					$("#power div").css("bottom", (power++ * 2));
+				}, 20);
+			}).mouseup(function() {
+				clearInterval(powerIncrease);
+				powerIncrease = null;
+				$("#power div").css("bottom", 0);
+				fire();
+			});
+			
+			function fire() {
+				var $bullet = $("#bullet");
+				
+				var top = $("#barrel").offset().top,
+					up = (90 - aim) * power / 10,
+					right = (power * aim) / 1000;
+					
+				var kat = 250 - top;
+				var left = Math.sqrt(Math.pow(100, 2) - Math.pow(kat, 2)) + $("#barrel").offset().left;
+					
+				$bullet.css({
+					top: top,
+					left: left
+				}).show();
+				
+				fireInterval = setInterval(function() {
+					right -= right * 0.001;
+					left += right;
+						
+					top -= (up-- / 100);
+					
+					$bullet.css({
+						top: top,
+						left: left
+					});
+					checkPosition(top, left);
+				}, 1);
+			}
+			
+			function checkPosition(top, left) {
+				var miss,hit;
+				if (top >= 300) {
+					miss = true;
+					$("#target").text("missed me!");
+				}
+				
+				if (top > 200 && top < 300 &&
+					left > 500 && left < 650) {
+						hit = true;
+						$("#target").text("auch!");
+					}
+				
+				if (miss || hit) {
+					clearInterval(fireInterval);
+					fireInterval = null;
+					power = 0;
+				}
+			}
+			
+		</script>
+	</body>
+</html>

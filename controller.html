@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<script src="http://code.jquery.com/jquery-latest.min.js"></script>
+		<!--script src="jquery.js"></script-->
+		<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.js"></script>
+		<link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/base/jquery-ui.css">
+		<script src="jquery.ui.punch.js"></script>
+		<script src="/socket.io/socket.io.js"></script>
+		<style>
+			#controller { padding: 20px; }
+			
+			#shoot {
+				position: absolute;
+				padding-left: 20px;
+				padding-top: 20px;
+				width: 80px;
+				height: 40px;
+				color: #fff;
+				top: 40px;
+				left: 200px;
+			}
+			
+			#power {
+				position: absolute;
+				left: 20px;
+				top: 40px;
+				height: 150px;
+				width: 20px;
+				background-image: linear-gradient(bottom, rgb(250,0,0) 100%, rgb(213,227,22) 0%);
+				background-image: -o-linear-gradient(bottom, rgb(250,0,0) 100%, rgb(213,227,22) 0%);
+				background-image: -moz-linear-gradient(bottom, rgb(250,0,0) 100%, rgb(213,227,22) 0%);
+				background-image: -webkit-linear-gradient(bottom, rgb(250,0,0) 100%, rgb(213,227,22) 0%);
+				background-image: -ms-linear-gradient(bottom, rgb(250,0,0) 100%, rgb(213,227,22) 0%);
+				background-image: -webkit-gradient(
+												linear,
+												left bottom,
+												left top,
+												color-stop(1, rgb(250,0,0)),
+												color-stop(0, rgb(213,227,22))
+											);
+			}
+			
+			#power div {
+				position: absolute;
+				bottom: 0;
+				height: 2px;
+				width: 30px;
+				left: -5px;
+				background-color: #000;
+			}
+			
+			#crack {
+				position: absolute;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				display: none;
+			}
+			
+			#aim {
+				position: absolute;
+				top: 10px;
+				left: 10px;
+				right: 10px;
+			}
+		</style>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+	</head>
+	<body>
+		<strong id="morePlayers">Trenger en spiller til</strong>
+		<strong id="queue" style="display:none;">Du er nr <span></span> i køen</strong>
+		<input id="name" placeholder="brukernavn"><input type="button" value="logg inn">
+		<div id="controller">
+			<div id="power"><div></div></div>
+			<div id="aim"></div>
+			<div id="shoot">SHOOT!</div>
+		</div>
+		<img src="crack.png" id="crack">
+		
+		<script>
+			$("#morePlayers").hide();
+			$("#controller").hide();
+			
+			$("input:button").click(function() {
+			    var url = location.host;
+			    if (url.indexOf("localhost") != -1)
+			        url = "http://localhost:8080/";
+
+			    var socket = io.connect(url);
+			    var playerNum;
+				
+				socket.emit("login", $("#name").val());
+								
+				socket.on("connect", function() {
+					console.log("test");
+					socket.emit("addPlayer");
+					
+					socket.on("connection", function(didConnect, code, msg) {
+						//codes:
+						//1:success
+						//2:brukernavn opptatt
+						//3:satt i kø
+						console.log("code", code);
+						console.log("msg", msg);
+						if (code == 2) {
+							alert(msg);
+						} else if (code == 3) {
+							alert("Rommet er fullt.\Du står nå som nr " + msg + " i køen");
+							$("input").hide();
+							$("#queue").show().find("span").text(msg);
+						}
+						else {
+							$("input").hide();
+							if (msg == 2) {
+							    $("#shoot").css("background", "blue");
+							    playerNum = 1;
+								$("#morePlayers, #queue").hide();
+								$("#controller").show();
+							}
+							else {
+								$("#morePlayers").show();
+							}
+						}
+					});
+					
+					socket.on("newPlayer", function() {
+						console.log("newPlayer");
+						$("#morePlayers").hide();
+						$("#controller").show();
+						$("#shoot").css("background", "red").data("disabled", false);
+						playerNum = 0;
+					});
+					
+					socket.on("removePlayer", function(name) {
+						console.log("removePlayer");
+						$("#shoot").css("background", "gray");
+						$("#morePlayers").show();
+						$("#controller").hide();
+					});
+					
+					socket.on("queueChange", function(length) {
+						console.log("queueChange");
+						var num = $("#queue span").text();
+						num--;
+						$("#queue span").text(num);
+					});
+					
+					socket.on("gameover", function() {
+						location.href = "gameover.html";
+					});
+					
+					$("#aim").slider({
+						min: -55,
+						max: 55,
+						value: 0,
+						slide: function(e, ui) {
+							sendMsg("aim", ui.value);
+						}
+					});
+					
+					var power = 0,
+						powerIncrease,
+						mousedown = "mousedown",
+						mouseup = "mouseup";
+					
+
+					var el = document.createElement('div');
+					el.setAttribute('ongesturestart', 'return;');
+					if (typeof el.ongesturestart == "function") {
+						mousedown = "touchstart";
+						mouseup = "touchend";
+					}
+						
+				    $("#shoot").bind(mousedown, function () {
+				        if (!$(this).data("disabled") == true) {
+				            powerIncrease = setInterval(function () {
+				                $("#power div").css("bottom", (power++ * 2));
+				                if (power == 75)
+				                	clearInterval(powerIncrease);
+				            }, 20);
+				        }
+				        return false;
+                    }).bind(mouseup, function () {
+                        if (!$(this).data("disabled") == true) {
+                            clearInterval(powerIncrease);
+                            powerIncrease = null;
+                            $("#power div").css("bottom", 0);
+                            sendMsg("shoot", power);
+                            power = 0;
+                            $(this).data("disabled", true);
+                        }
+                    });
+
+				    socket.on("hit", function (isHit, playerHit, playerShot) {
+				        
+				        if (isHit && playerShot == playerNum && playerHit == playerNum) {
+				        	$("#crack").show();
+                        } else if (isHit && playerShot != playerNum && playerHit != playerNum) {
+                            //TODO: lag noe fancy for å vise at den andre spilleren tok selvmord
+                        } else if (isHit && playerShot == playerNum) {
+                            //TODO: lag noe fancy for å vise treff
+                        } else if (isHit && playerHit == playerNum) {
+                        	$("#crack").show();
+                        }
+                        
+                        setTimeout(function() {
+                        	$("#crack").hide();
+                        }, 1000);
+
+				        if (isHit) {
+				            $("#aim").slider("value", 0);
+				        }
+
+				        if (playerShot == playerNum || isHit) {
+				            $("#shoot").data("disabled", false);
+				        }
+					});
+					
+					function sendMsg(name, val) {
+						if (!$("#morePlayers").is(":visible"))
+							socket.emit(name, val);
+					}
+				});
+			});
+			
+		</script>
+	</body>
+</html>

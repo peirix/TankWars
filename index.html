@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Tanks</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<style type="text/css" media="screen">
+			html, body { height:100%; background-color: #000000;}
+			body { margin:0; padding:0; overflow:hidden; color:White }
+			#flashContent { width:100%; height:100%; }
+			
+			#stage {
+				width: 1200px;
+				height: 450px;
+				background-color: #ccc;
+				overflow: hidden;
+				position: relative;
+			}
+			
+			#wind {
+				font-size: 30px;
+				position: absolute;
+				left: 50%;
+				margin-left: -50px;
+			}
+			
+			.tanks {
+				width: 150px;
+				height: 100px;
+				background-color: green;
+				position: absolute;
+				top: 300px;
+				left: 130px;
+			}
+			#tanks1 { left: 900px; }
+			
+				.barrel {
+					height: 100px;
+					width: 10px;
+					position: absolute;
+					top: -50px;
+					left: 70px;
+					background-color: red;
+					-webkit-transform-origin: bottom center;
+					-moz-transform-origin: bottom center;
+					transform-origin: bottom center;
+				}
+				#tanks1 .barrel { background-color: blue; }
+				
+				.tanks span {
+					position: absolute;
+					left: 0;
+					bottom: 0;
+					right: 0;
+					text-align: center;
+				}
+				
+				.tanks h2 {
+					font-size: 50px;
+					margin-top: 25px;
+					margin-left: 156px;
+					color: red;
+				}
+				#tanks1 h2 {
+					margin-left: 0;
+					color: blue;
+					right: 155px;
+					position: relative;
+					text-align: right;
+				}
+
+			.bullet {
+				width: 10px;
+				height: 10px;
+				background-color: red;
+				-webkit-border-radius: 10px;
+				-moz-border-radius: 10px;
+				border-radius: 10px;
+				position: absolute;
+				display: none;
+			}
+			#bullet1 { background-color: blue; }
+		</style>
+		
+        <script src="http://code.jquery.com/jquery-latest.min.js"></script>
+		<script src="/socket.io/socket.io.js"></script>
+        
+ 		<script >  
+			function getFlashMovie(movieName) {   
+				var isIE = navigator.appName.indexOf("Microsoft") != -1;   
+				return (isIE) ? window[movieName] : document[movieName];  
+			}
+			
+			var url = location.host;
+			if (url.indexOf("localhost") != -1)
+			    url = "http://localhost:8080/";
+
+			var socket = io.connect(url);
+			socket.on("connect", function() {
+				var players = {
+					red : {
+						name: "",
+						score: 0
+					},
+					blue: {
+						name: "",
+						score: 0
+					},
+					redScore: function(add) {
+						if (!isNaN(add)) {
+							this.red.score += add;
+							$("#tanks0 h2").text(this.red.score);
+						}
+						
+						return this.red.score;
+					},
+					blueScore: function(add) {
+						if (!isNaN(add)) {
+							this.blue.score += add;
+							$("#tanks1 h2").text(this.blue.score);
+						}
+						
+						return this.blue.score;
+					},
+					score: function(playerNum, playerHit) {
+						if (playerNum == 0) { //red
+							if (playerHit == 0) {
+								this.redScore(-1);
+							} else {
+								this.redScore(1);
+							}
+						} else {
+							if (playerHit == 1) {
+								this.blueScore(-1);
+							} else {
+								this.blueScore(1);
+							}
+						}
+					},
+					reset: function() {
+						this.red.name = "";
+						this.red.score = 0;
+						this.blue.name = "";
+						this.blue.score = 0;
+						$(".tanks h2").text("0");
+						$(".bullett").hide();
+						stopBullets();
+					}
+				}
+					
+				socket.emit("login", 0);
+				
+				socket.on("newPlayer", function (name, num, otherplayer) {
+                    //TODO: find out how this works with queues....
+                    console.log("newPlayer", name);
+                    console.log("number of players", num);
+                    console.log("other player", otherplayer);
+				    $("#tanks" + num + " span").text(name);
+				    $("#tanks" + Math.abs(num-1) + " span").text(otherplayer);
+				    repositionTanks();
+                });
+				
+				socket.on("removePlayer", function(name) {
+					$("#playerList div").filter(function() {
+						return $(this).text() == name;
+					}).remove();
+				});
+				
+				var aim = [];
+				aim[0] = 0;
+				aim[1] = 0;
+				var fireInterval = [];
+				fireInterval[0] = null;
+				fireInterval[1] = null;
+				var wind = 0;
+				var ground = 400;
+				
+				socket.on("aim", function(player, change) {
+					aim[player] = change;
+					var rot = "rotateZ(" + change + "deg)";
+					$("#tanks" + player + " .barrel").css({
+						"-webkit-transform": rot,
+						"-moz-transform": rot,
+						"transform": rot
+					});
+					//getFlashMovie("Tanks").sendTextToFlash(player + ",angle," + change);
+				});
+				
+				socket.on("shoot", function(player, power) {
+					var $bullet = $("#bullet" + player);
+					$bullet.stop();
+
+				    //up is wrong for aiming left
+					var up = (90 - Math.abs(aim[player])) * power / 10,
+						right = (power * aim[player]) / 1000;
+
+				    //pythagoras FTW!
+                    var radians = aim[player] * Math.PI / 180
+                    // solve for center and up
+                    var sidea = Math.cos(radians) * 100;
+                    // solve for center and sideways
+                    var sideb = Math.sin(radians) * 100;
+
+                    var top = $("#tanks" + player).offset().top + 50 - sidea;
+                    var left = $("#tanks" + player).offset().left + 70 + sideb;
+
+					$bullet.css({
+						top: top,
+						left: left
+					}).show();
+					
+					fireInterval[player] = setInterval(function() {
+						right -= right * 0.001 - wind / 10000;
+						left += right;
+							
+						top -= (up-- / 100);
+						
+						$bullet.css({
+							top: top,
+							left: left
+						});
+						checkPosition(top, left, player);
+					}, 1);
+					
+					//getFlashMovie("Tanks").sendTextToFlash(player + ",shoot");
+				});
+				
+				function checkPosition(top, left, player) {
+					var miss,hit,playerHit;
+					if (top >= ground) {
+						miss = true;
+                    }
+
+                    //correction for offsetmeasuring
+					if (player == 0) {
+					    top += 10;
+					    left += 10;
+					}
+
+					var $tanks0 = $("#tanks0"),
+                        $tanks1 = $("#tanks1");
+					var offset0 = $tanks0.offset(),
+                        offset1 = $tanks1.offset();
+
+					if (top > offset0.top && top < offset0.top + $tanks0.height() &&
+						left > offset0.left && left < offset0.left + $tanks0.width()) {
+						    hit = true;
+						    playerHit = 0;
+                        }
+
+					if (top > offset1.top && top < offset1.top + $tanks1.height() &&
+						left > offset1.left && left < offset1.left + $tanks1.width()) {
+						    hit = true;
+						    playerHit = 1;
+						}
+
+					if (miss || hit) {
+						clearInterval(fireInterval[player]);
+						fireInterval[player] = null;
+						$("#bullet" + player).hide();
+						power = 0;
+						socket.emit("hit", hit, playerHit, player);
+                    }
+
+					if (hit) {
+						stopBullets();
+						resetBarrel();
+					    players.score(player, playerHit);
+					    $(".bullet").hide();
+					    repositionTanks();
+					}
+				}
+				
+				function stopBullets() {
+					clearInterval(fireInterval[0]);
+					fireInterval[0] = null;
+					clearInterval(fireInterval[1]);
+					fireInterval[1] = null;
+				}
+				
+				function resetBarrel() {
+					$(".barrel").css("-webkit-transform", "rotate(0deg)");
+				    aim[0] = 0;
+				    aim[1] = 0;
+				}
+				
+				function repositionTanks() {
+					var top1 = Math.random() * 100 + 200;
+					var top2 = Math.random() * 100 + 200;
+					$("#tanks0").css({
+						"left": Math.random() * 360 + 40,
+						"top": top1
+					});
+					$("#tanks1").css({
+						"left": Math.random() * 400 + 500,
+						"top": top2
+					});
+					
+					ground = Math.max(top1, top2) + 100;
+					wind = Math.floor(Math.random() * 100 - 50);
+					var windText = wind;
+					if (wind > 0)
+						windText = wind + " ->";
+					else if (wind < 0)
+						windText = "<- " + Math.abs(wind);
+						
+					$("#wind span").text(windText);
+				}
+				
+				socket.on("reset", function() {
+					resetBarrel();
+					players.reset();
+				});
+			});
+		</script>
+        
+	</head>
+	<body>
+		<div id="stage">
+			<div id="wind">vind: <span></span></div>
+			<div id="tanks0" class="tanks"><div class="barrel"></div><span></span><h2>0</h2></div>
+			<div id="tanks1" class="tanks"><div class="barrel"></div><span></span><h2>0</h2></div>
+			<div id="bullet0" class="bullet"></div>
+			<div id="bullet1" class="bullet"></div>
+		</div>
+		<!--
+        <div id="flashContent">
+			<object classid="clsid:d27cdb6e-ae6d-11cf-96b8-444553540000" codebase="http://fpdownload.macromedia.com/pub/shockwave/cabs/flash/swflash.cab#version=11,0,0,0" id="Tanks" width="1000" height="600" align="middle">
+				<param name="allowScriptAccess" value="sameDomain" />
+				<param name="movie" value="Tanks.swf" />
+				<param name="quality" value="high" />
+				<param name="bgcolor" value="#000000" />
+				<param name="wmode" value="transparent" />
+				<embed src="Tanks.swf" quality="high" bgcolor="#000000" width="1000" height="300" swLiveConnect=true id="Tanks" wmode="transparent" name="Tanks" align="middle" allowScriptAccess="sameDomain" type="application/x-shockwave-flash" pluginspage="http://www.adobe.com/go/getflashplayer" />
+			</object>
+		</div>
+		<div id="playerList" style="position: absolute; z-index: 1000; height: 60px; width:150px; background:red; top:70px;left:0;"></div>
+		-->
+	</body>
+</html>
